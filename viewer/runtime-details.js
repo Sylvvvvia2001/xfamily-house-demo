@@ -1,0 +1,40 @@
+import {createTelevision} from './television-programs.js';
+import {topMatches,attachPreservingWorld} from './scene-integrity.js?v=graph-feedback-03';
+import { createDeviceAnimations } from './device-animation.js?v=tea-wardrobe-01';
+// Visual appliance articulations only; no new source-device events are invented.
+export function createRoutineDetails(THREE,scene,segments,props,timeline={}){
+ const P=a=>new THREE.Vector3(a[0],a[2],-a[1]),ease=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x)},nodes=[];
+ function hinge(id,select,pivot,axis,angle){const g=new THREE.Group();g.name=id;g.position.copy(P(pivot));scene.add(g);const meshes=topMatches(scene,o=>select(o.userData.source_object||'',o.userData.source_root||''));attachPreservingWorld(g,meshes);const n={g,axis:P(axis),angle};nodes.push(n);return n;}
+ const fridge=[hinge('RoutineFridgeLeft',n=>n==='door_01_mesh_00.001',[-10.335,-2.94,.06],[0,0,1],Math.PI*.52),hinge('RoutineFridgeRight',n=>n==='door_02_mesh_00',[-9.429,-2.94,.06],[0,0,1],-Math.PI*.52)];
+ const wardrobe=hinge('RoutineWardrobeLeft',n=>n==='wardrobe_left',timeline.wardrobePivot||[-3.074,-7.317,.887],[0,0,-1],Math.PI*.52);
+ const wardrobeRight=hinge('RoutineWardrobeRight',n=>n==='wardrobe_right',timeline.wardrobeRightPivot||[-3.074,-5.94,.887],[0,0,1],Math.PI*.52);
+ const oven=hinge('RoutineOvenDoor',(n,r)=>r==='OBJROOT__03_Kitchen__Oven'&&/^Oven__(Door|Handle)_/.test(n),[-10.44645,.19,.05053],[1,0,0],Math.PI/2);
+ const entry=hinge('RoutineEntryDoor',n=>false,[-4.76306,1.01,.027],[0,0,1],-Math.PI*.52);
+ const tv=createTelevision(THREE,scene,timeline),screen=tv.screen;
+ function stateAt(time,object){const target={fridge:'kitchen:fridge',oven:'kitchen:oven',washer:'balcony:washer',dryer:'balcony:dryer',microwave:'kitchen:microwave',entry:'entry:door',wardrobe:'bedroom:wardrobe'}[object];const track=(timeline.propStateTimeline||[]).find(x=>x.target===target);if(track){let value=track.initialState==='open'?1:0;for(const e of track.events){const to=e.value==='open'?1:0;if(e.time>time){const start=e.start??e.time-.45;const duration=e.time-start;if(time>=start)value=value+(to-value)*ease((time-start-duration*.18)/Math.max(.1,duration*.72));break;}value=to;}return value;}let value=0;for(const s of segments){if(s.start>time)break;if(!(s.objects||[]).includes(object)||!['open','close'].includes(s.skill))continue;const u=ease((time-s.start)/Math.max(1,s.end-s.start));value=s.skill==='open'?u:1-u;}return value;}
+ // Modest scenario cues: synthesized video/work screens, a coffee stream and tap water.
+ function panel(width,height,pos,rotationY=0){const c=document.createElement('canvas');c.width=768;c.height=432;const tex=new THREE.CanvasTexture(c);tex.colorSpace=THREE.SRGBColorSpace;const m=new THREE.Mesh(new THREE.PlaneGeometry(width,height),new THREE.MeshBasicMaterial({map:tex,toneMapped:false}));m.position.copy(P(pos));m.rotation.y=rotationY;scene.add(m);return {m,c,ctx:c.getContext('2d'),tex};}
+ const work=panel(.48,.268,[-.33,-8.078,1.19]);
+ const phone=panel(.058,.115,[0,0,0]);phone.m.rotation.x=-Math.PI/2;
+ if(props.phone){const spec=props.phone.spec;phone.m.position.copy(P([spec.original[0][3],spec.original[1][3],spec.original[2][3]+spec.size[2]/2+.0015]));props.phone.g.attach(phone.m);}
+ const deviceEffects=createDeviceAnimations(THREE,scene,segments,props,timeline);
+ const washer=hinge('RoutineWasherDoor',(n,r)=>r==='OBJROOT__06_Balcony__WashingMachine'&&['WashingMachine__Door','WashingMachine__DoorGlass'].includes(n),[4.667,-2.879,.578],[0,0,1],Math.PI*.55);
+ const dryer=hinge('RoutineDryerDoor',(n,r)=>r==='OBJROOT__06_Balcony__Dryer'&&['Dryer__Door','Dryer__DoorGlass'].includes(n),[5.6034,-2.879,.578],[0,0,1],Math.PI*.55);
+ const microwave=hinge('RoutineMicrowaveDoor',(n,r)=>r==='OBJROOT__03_Kitchen__Microwave'&&(/^(Door |Handle |Glass |Mesh • Door)/.test(n)),[-10.45,-3.145,.972],[0,0,1],-Math.PI*.55);
+ let phoneTick=-1; const phoneContent=(time,active)=>{phone.m.visible=props.phone?.g.visible&&!!(active.state_before.phone_video||active.alias==='table_video'||['use_phone','play_phone','watch_video_on_phone'].includes(active.skill));if(!phone.m.visible||Math.floor(time*12)===phoneTick)return;phoneTick=Math.floor(time*12);const ctx=phone.ctx;ctx.fillStyle='#101a27';ctx.fillRect(0,0,768,432);ctx.fillStyle='#536a86';ctx.fillRect(25,25,718,300);ctx.fillStyle='#eece98';const x=384+140*Math.sin(time*.65);ctx.beginPath();ctx.arc(x,153,64,0,Math.PI*2);ctx.fill();ctx.fillStyle='white';ctx.font='bold 35px sans-serif';ctx.fillText('DAILY VIDEO',35,380);ctx.fillStyle='#e6a66a';ctx.fillRect(35,403,(time%18)/18*690,5);phone.tex.needsUpdate=true;phone.m.visible=props.phone?.g.visible&&!!(active.state_before.phone_video||active.alias==='table_video'||['use_phone','play_phone','watch_video_on_phone'].includes(active.skill));};
+ const meal=new THREE.Group();meal.name='RoutineDinnerContents';scene.add(meal);
+ if(props.plate){const b=props.plate.spec;for(let i=0;i<28;i++){const radius=.02+.055*Math.sqrt((i+.5)/28),a=i*2.39996;const food=new THREE.Mesh(new THREE.SphereGeometry(.009,8,6),new THREE.MeshStandardMaterial({color:i%4?'#e5d2a5':'#b28043',roughness:.85}));food.scale.set(1.5,.6,.8);food.position.copy(P([b.original[0][3]+radius*Math.cos(a),b.original[1][3]+radius*Math.sin(a),b.original[2][3]+b.size[2]/2+.007+(i%3)*.003]));meal.add(food);}props.plate.g.attach(meal);}
+ function extraUpdate(time,states,active){
+  meal.visible=active.state_before.dish_contents==='dinner_on_plate'&&!active.privacy;
+  const eating=segments.filter(s=>['eat_by_hand','eat_with_utensil'].includes(s.skill)&&s.start<=time);const lastMeal=eating.at(-1);const dinnerFraction=lastMeal?Math.max(0,Math.min(1,(time-lastMeal.start)/Math.max(1,lastMeal.end-lastMeal.start))):0;meal.children.forEach((o,i)=>o.visible=i/28>=dinnerFraction*.9);
+  deviceEffects.update(time,states,active);
+  washer.g.quaternion.setFromAxisAngle(washer.axis,washer.angle*stateAt(time,'washer'));dryer.g.quaternion.setFromAxisAngle(dryer.axis,dryer.angle*stateAt(time,'dryer'));microwave.g.quaternion.setFromAxisAngle(microwave.axis,microwave.angle*stateAt(time,'microwave'));
+  work.m.visible=active.room==='study'&&active.state_before.posture==='seated'&&!active.privacy;
+  if(work.m.visible&&Math.floor(time*2)!==work.tick){work.tick=Math.floor(time*2);const c=work.ctx,meeting=/meeting|conference/i.test(active.title||'');c.fillStyle='#182432';c.fillRect(0,0,768,432);c.fillStyle='#ecf0f6';c.font='bold 28px sans-serif';c.fillText(meeting?'TEAM VIDEO MEETING':'WORKSPACE · DAILY NOTES',26,45);
+   if(meeting){for(let i=0;i<4;i++){const x=25+(i%2)*370,y=75+Math.floor(i/2)*164;c.fillStyle=['#354c64','#6b5662','#53644e','#605e73'][i];c.fillRect(x,y,345,145);c.fillStyle='#c6cbd1';c.beginPath();c.arc(x+170,y+55,27,0,Math.PI*2);c.fill();c.fillRect(x+125,y+92,90,38);c.fillStyle='#eee';c.font='16px sans-serif';c.fillText('Participant '+(i+1),x+12,y+132);}}
+   else{c.fillStyle='#eceff3';c.fillRect(25,70,530,335);c.fillStyle='#7b8d9b';for(let i=0;i<12;i++)c.fillRect(48,95+i*23,250+(i%3)*65,5);c.fillStyle='#647c95';c.fillRect(580,75,160,120);}work.tex.needsUpdate=true;}
+  phoneContent(time,active);
+ }
+
+ return {television:tv,effects:deviceEffects,roots:[...nodes.map(x=>x.g),screen,work.m,phone.m,meal,...deviceEffects.roots],update(time,states,active){tv.update(time,states,active);extraUpdate(time,states,active);wardrobe.g.quaternion.setFromAxisAngle(wardrobe.axis,wardrobe.angle*stateAt(time,'wardrobe'));wardrobeRight.g.quaternion.setFromAxisAngle(wardrobeRight.axis,wardrobeRight.angle*stateAt(time,'wardrobe'));const f=stateAt(time,'fridge');for(const n of fridge)n.g.quaternion.setFromAxisAngle(n.axis,n.angle*f);oven.g.quaternion.setFromAxisAngle(oven.axis,oven.angle*stateAt(time,'oven'));let e=0;for(const s of segments){if(!['enter_home','leave_home'].includes(s.skill)||time<s.start||time>=s.end)continue;const u=(time-s.start)/(s.end-s.start);e=u<.3?ease(u/.3):u>.7?1-ease((u-.7)/.3):1;}if((timeline.propStateTimeline||[]).some(x=>x.target==='entry:door'))e=stateAt(time,'entry');entry.g.quaternion.setFromAxisAngle(entry.axis,entry.angle*e);}};
+}
