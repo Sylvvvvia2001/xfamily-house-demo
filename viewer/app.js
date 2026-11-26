@@ -1,4 +1,7 @@
-import './assets.js';
+import {fast} from './assets.js?v=quick-2';
+import {loadMotions} from './motions.js';
+import {installFastTextures} from './fast-textures.js';
+import {MeshoptDecoder} from 'three/addons/libs/meshopt_decoder.module.js';
 import {bindShortPauses,bindShortPauseProps} from './short-pauses.js';
 import {topMatches,attachPreservingWorld,createDoorGeometry,repairSurfaceLayers} from './scene-integrity.js?v=native-motion-04';
 import {splitWardrobeDoors} from './wardrobe.js';
@@ -42,13 +45,15 @@ dayPicker.onchange = () => {
  u.searchParams.set('view',$('free-mode').classList.contains('active')?'free':'cameras');
  location.href=u.href;
 };
-const stats={visualVersion:4,participant,errors:[],sourceHouse:'v102',sourceWindow:['06:00:00','03:00:00 +1d'],ready:false};window.review={stats};window.addEventListener('error',e=>stats.errors.push(e.message));window.addEventListener('unhandledrejection',e=>{$('loading').textContent=String(e.reason);stats.errors.push(String(e.reason));});
+const stats={visualVersion:4,participant,errors:[],sourceHouse:'v102',sourceWindow:['06:00:00','03:00:00 +1d'],ready:false};window.review={stats};window.addEventListener('error',e=>stats.errors.push(e.message));window.addEventListener('unhandledrejection',e=>{window.houseStartup.fail(e.reason);stats.errors.push(String(e.reason));});
 const [motion,data,house]=await Promise.all([dayBase+'motion.json',dayBase+'timeline.json','../house/analysis/house-export.json'].map(x=>fetch(x,{cache:'no-cache'}).then(r=>r.json())));if (data.participant!==participant || data.date!==selectedDay.date) throw Error('Participant or date mismatch in compiled playback.');$('date-label').textContent=data.date+' · HOUSE V102'+(selectedDay.status==='diagnostic_preview'?' · Diagnostic preview':'');$('sequence-link').href=selectedDay.sequence;$('timeline-link').href=selectedDay.sequence+'#devices';$('execution-link').href=selectedDay.executionDetails;const scene=new THREE.Scene();scene.background=new THREE.Color('#b7c2c7');const renderer=new THREE.WebGPURenderer({canvas:$('scene'),antialias:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(1.6,devicePixelRatio));renderer.toneMapping=THREE.AgXToneMapping;renderer.toneMappingExposure=1.18;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFShadowMap;await renderer.init();
 const env=new RoomEnvironment(),pmrem=new THREE.PMREMGenerator(renderer);scene.environment=pmrem.fromScene(env,.04).texture;scene.environmentIntensity=.40;env.dispose();const hemi=new THREE.HemisphereLight('#ecf4ff','#a18e70',1.0);scene.add(hemi);
+if(fast)window.houseStartup.stage('Downloading compact material textures…');
+await installFastTextures(THREE,fast);
 const quality=await createMaterialQuality(THREE,stats);
 const pauseBindings=await fetch(dayBase+'short-pauses.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw Error('Missing short-pause bindings for '+participant);return r.json()});
 bindShortPauses(motion,pauseBindings,participant,data.date);
-const loader=new GLTFLoader(),roomObjects=[],curtains=[],allCurtains={},ceiling=[],fixtures={bedroom:[],floorlamp:[]};let actor,bones,rootBone;const segments=motion.segments;let t=21600,playing=false,mode='cameras',group='follow',last=0,dirty=true,renderBusy=false;
+const loader=new GLTFLoader().setMeshoptDecoder(MeshoptDecoder),roomObjects=[],curtains=[],allCurtains={},ceiling=[],fixtures={bedroom:[],floorlamp:[]};let actor,bones,rootBone;const segments=motion.segments;let t=21600,playing=false,mode='cameras',group='follow',last=0,dirty=true,renderBusy=false;
 const defs=[
  {id:'STUDY · A',room:'study',p:[-3.50,-10.94,2.73],to:[-.35,-8.9,.7],fov:70},
  {id:'STUDY · B',room:'study',p:[1.5,-7.82,2.73],to:[-.9,-9.5,.7],fov:70},
@@ -84,7 +89,7 @@ async function repairMissingTextureChannels(gltf,path){
 }
 
 for(const [i,f] of house.files.entries()){
- $('loading').textContent=`Loading House v102 · ${f.room.replace(/^\d+_/,'')} (${i+1}/${house.files.length})`;
+ window.houseStartup.stage(`Loading House v102 · ${f.room.replace(/^\d+_/,'')} (${i+1}/${house.files.length})`);
  const gltf=await loader.loadAsync('../house/'+f.path);await repairMissingTextureChannels(gltf,'../house/'+f.path);await quality.apply(gltf.scene);scene.add(gltf.scene);roomObjects.push(gltf.scene);
  gltf.scene.traverse(o=>{
   let meta=o;while(meta&&!meta.userData.source_root)meta=meta.parent;const u=meta?.userData||{};
@@ -101,8 +106,9 @@ const spareLeaves = topMatches(scene,o=>o.userData.source_root==='OBJROOT__00_Sh
 stats.unplacedDoorTemplates = spareLeaves.map(o=>o.userData.source_object);
 for(const leaf of spareLeaves)leaf.removeFromParent();
 repairSurfaceLayers(scene,stats);
-$('loading').textContent='Loading the current character and registered motion clips…';const ag=await loader.loadAsync(motion.actor);actor=ag.scene;scene.add(actor);const boneMap=new Map();actor.traverse(o=>{o.frustumCulled=false;if(o.isBone)boneMap.set(o.name,o);if(o.isMesh){o.castShadow=true;o.receiveShadow=true;for(const m of Array.isArray(o.material)?o.material:[o.material])for(const v of Object.values(m)){if(v?.isTexture){const k=v.channel?'uv'+v.channel:'uv';if(!o.geometry.attributes[k]&&o.geometry.attributes.uv)o.geometry.setAttribute(k,o.geometry.attributes.uv);}}for(const m of Array.isArray(o.material)?o.material:[o.material]){m.envMapIntensity=.5;if(m.map)m.map.anisotropy=8}}});for(const [obj,a]of ag.parser.associations)if(Number.isInteger(a.nodes)){const n=ag.parser.json.nodes[a.nodes]?.name;if(n)boneMap.set(n,obj)}bones=motion.bone_names.map(n=>boneMap.get(n)||boneMap.get(THREE.PropertyBinding.sanitizeNodeName(n)));if(bones.some(b=>!b))throw Error('Current character joint mapping is incomplete');rootBone=bones[motion.parents.indexOf(-1)];
-const streamCache=new Map();for(const s of segments.flatMap(s=>s.cleaningSource?[s,s.cleaningSource]:[s])){if(!s.file)continue;if(!streamCache.has(s.file))streamCache.set(s.file,fetch(new URL(s.file,new URL(selectedDay.base,location.href))).then(r=>{if(!r.ok)throw Error('Motion cache unavailable: '+s.file);return r.arrayBuffer()}).then(x=>new Float32Array(x)));s.pose=await streamCache.get(s.file);}
+window.houseStartup.stage('Preparing the character…');const ag=await loader.loadAsync(motion.actor);actor=ag.scene;scene.add(actor);const boneMap=new Map();actor.traverse(o=>{o.frustumCulled=false;if(o.isBone)boneMap.set(o.name,o);if(o.isMesh){o.castShadow=true;o.receiveShadow=true;for(const m of Array.isArray(o.material)?o.material:[o.material])for(const v of Object.values(m)){if(v?.isTexture){const k=v.channel?'uv'+v.channel:'uv';if(!o.geometry.attributes[k]&&o.geometry.attributes.uv)o.geometry.setAttribute(k,o.geometry.attributes.uv);}}for(const m of Array.isArray(o.material)?o.material:[o.material]){m.envMapIntensity=.5;if(m.map)m.map.anisotropy=8}}});for(const [obj,a]of ag.parser.associations)if(Number.isInteger(a.nodes)){const n=ag.parser.json.nodes[a.nodes]?.name;if(n)boneMap.set(n,obj)}bones=motion.bone_names.map(n=>boneMap.get(n)||boneMap.get(THREE.PropertyBinding.sanitizeNodeName(n)));if(bones.some(b=>!b))throw Error('Current character joint mapping is incomplete');rootBone=bones[motion.parents.indexOf(-1)];
+await loadMotions(segments,new URL(selectedDay.base,location.href));
+window.houseStartup.stage('Preparing doors, lighting and camera views…');
 // Replace only the wardrobe cabinet/leaves with the closed derivative; clothes remain untouched.
 const wardrobeOld=[];scene.traverse(o=>{if(o.userData.source_root==='OBJROOT__04_Bedroom__Wardrobe_W03_01')wardrobeOld.push(o)});for(const o of wardrobeOld)o.removeFromParent();
 const wardrobeClosed=await loader.loadAsync('../materials/assets/wardrobe-closed.glb');await quality.apply(wardrobeClosed.scene);scene.add(wardrobeClosed.scene);stats.wardrobeInitial='closed';
