@@ -1,3 +1,9 @@
-# XFamily House
+<h1 align="center">X-Family</h1>
 
-[S01 interactive preview](https://Sylvvvvia2001.github.io/xfamily-house-demo/)
+<p align="center">A benchmark for understanding everyday routines in a smart home.</p>
+
+![The X-Family living room, with the dining area and kitchen visible beyond the sofas.](images/xfamily-living-room.jpg)
+
+X-Family pairs a resident’s daily activities with the events recorded by devices around the home. Follow a day in 3D to see how the two unfold together.
+
+[Explore the interactive 3D home](https://sylvvvvia2001.github.io/xfamily-house-demo/)
